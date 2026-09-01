@@ -36,4 +36,6 @@ export const defaultBackground: BackgroundConfig = {
 	type: 'gradient',
 	gradientTop: '#ececec',
 	gradientBottom: '#f8f8f8',
+	gradientAngle: 180,
+	gradientSpread: 1,
 };

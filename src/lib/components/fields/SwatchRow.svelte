@@ -10,15 +10,58 @@
 	} = $props();
 </script>
 
-<div class="flex flex-wrap gap-2">
+<div class="swatch-row">
 	{#each options as opt (opt.id)}
 		<button
+			data-showcase-option={opt.id}
 			title={opt.label}
-			class="h-8 w-8 rounded-full border transition-transform {value === opt.id
-				? 'border-[var(--kairo-sapphire)] ring-2 ring-[var(--kairo-sapphire-soft)] scale-110'
-				: 'border-black/10 hover:scale-105'}"
-			style={`background: ${opt.swatch}`}
+			aria-label={opt.label}
+			aria-pressed={value === opt.id}
+			class:active={value === opt.id}
+			class="swatch-button"
 			onclick={() => onchange(opt.id)}
-		></button>
+		>
+			<span class="swatch" style={`background: ${opt.swatch}`}></span>
+		</button>
 	{/each}
 </div>
+
+<style>
+	.swatch-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 7px;
+	}
+
+	.swatch-button {
+		display: grid;
+		height: 28px;
+		width: 28px;
+		place-items: center;
+		border: 1px solid transparent;
+		border-radius: 50%;
+		background: transparent;
+		transition: border-color 140ms ease, background-color 140ms ease, transform 80ms ease;
+	}
+
+	.swatch-button:hover {
+		background: var(--kairo-field-hover);
+	}
+
+	.swatch-button:active {
+		transform: translateY(1px);
+	}
+
+	.swatch-button.active {
+		border-color: var(--kairo-sapphire);
+		background: var(--kairo-sapphire-faint);
+	}
+
+	.swatch {
+		height: 20px;
+		width: 20px;
+		border: 1px solid oklch(0.25 0.018 242 / 0.18);
+		border-radius: 50%;
+		box-shadow: inset 0 0 0 1px oklch(0.98 0.004 242 / 0.32);
+	}
+</style>

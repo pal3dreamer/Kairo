@@ -11,6 +11,8 @@ export type BackgroundConfig = {
 	solidColor?: string;
 	gradientTop?: string;
 	gradientBottom?: string;
+	gradientAngle?: number;
+	gradientSpread?: number;
 	imageUrl?: string;
 };
 

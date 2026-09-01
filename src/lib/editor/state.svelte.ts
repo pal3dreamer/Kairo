@@ -67,7 +67,7 @@ const EDITOR_CONTEXT = Symbol('kairo-editor');
  * Components read and write this store directly instead of prop-drilling.
  */
 export function provideEditorState() {
-	let selection = $state<SceneObjectId | null>(null);
+	let selection = $state<SceneObjectId | null>('phone');
 	let transformMode = $state<TransformMode>('none');
 
 	let screenSrc = $state('');
@@ -143,6 +143,8 @@ export function provideEditorState() {
 		setStudio(id: StudioPresetId) {
 			studio = id;
 			const preset = studioPresets[id];
+			if (preset.hdri) hdri = preset.hdri;
+			if (preset.exposure !== null) exposure = preset.exposure;
 			if (preset.background) background = { ...preset.background };
 		},
 		setBackground(config: BackgroundConfig) {

@@ -121,6 +121,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@lucide/svelte@npm:^1.39.0":
+  version: 1.39.0
+  resolution: "@lucide/svelte@npm:1.39.0"
+  peerDependencies:
+    svelte: ^5
+  checksum: 10c0/6b0a54abe39c6f024fc2ceb01116f0f7687f98654e83cdb60f5bed4a2ed36da8cff7c6f48967eefa4aa0857f7981258610ba7cdd44bfee6f61358d5523c0469f
+  languageName: node
+  linkType: hard
+
 "@napi-rs/wasm-runtime@npm:^1.1.4, @napi-rs/wasm-runtime@npm:^1.1.6":
   version: 1.1.6
   resolution: "@napi-rs/wasm-runtime@npm:1.1.6"
@@ -846,6 +855,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "kairo@workspace:."
   dependencies:
+    "@lucide/svelte": "npm:^1.39.0"
     "@sveltejs/adapter-auto": "npm:^7.0.1"
     "@sveltejs/kit": "npm:^2.63.0"
     "@sveltejs/vite-plugin-svelte": "npm:^7.1.2"

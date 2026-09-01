@@ -11,13 +11,13 @@ export const backgroundPresets: { id: string; label: string; swatch: string; con
 		id: 'light',
 		label: 'Light',
 		swatch: '#ececec',
-		config: { type: 'gradient', gradientTop: '#ececec', gradientBottom: '#f8f8f8' },
+		config: { type: 'gradient', gradientTop: '#e8eaed', gradientBottom: '#f7f7f5', gradientAngle: 180, gradientSpread: 0.82 },
 	},
 	{
 		id: 'dark',
 		label: 'Dark',
 		swatch: '#2a2a30',
-		config: { type: 'gradient', gradientTop: '#2a2a30', gradientBottom: '#16161a' },
+		config: { type: 'gradient', gradientTop: '#34363b', gradientBottom: '#15171a', gradientAngle: 145, gradientSpread: 0.9 },
 	},
 	{ id: 'warm', label: 'Warm', swatch: '#efe3d0', config: { type: 'solid', solidColor: '#efe3d0' } },
 	{
