@@ -5,72 +5,67 @@
 	import { OrbitControls, GLTF, Environment, ContactShadows } from '@threlte/extras';
 	import {
 		ACESFilmicToneMapping,
+		Color,
 		Mesh,
 		MeshStandardMaterial,
 		RectAreaLight,
+		WebGLRenderer,
+		type Group,
 		type PerspectiveCamera,
 		type Texture,
 	} from 'three';
 	// @ts-expect-error
 	import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
+	// @ts-expect-error
 	import type { OrbitControls as ThreeOrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 	import ScreenImage from './ScreenImage.svelte';
 	import TransformControls from './TransformControls.svelte';
 	import CameraRef from './CameraRef.svelte';
 	import EditorOverlay from './EditorOverlay.svelte';
+	import LightRig from './LightRig.svelte';
+	import Exporter from './Exporter.svelte';
+	import { surfaces } from '$lib/renderer/surfaces';
+	import {
+		isBodyMesh,
+		isFrontMesh,
+		isLogoMesh,
+		materialPresets,
+	} from '$lib/renderer/materialPresets';
+	import { bodyColors } from '$lib/renderer/bodyColors';
+	import { studioPresets } from '$lib/renderer/studioPresets';
+	import { defaultCamera } from '$lib/renderer/presets';
+	import { MODEL_URL, provideEditorState } from '$lib/editor/state.svelte';
+	import type { ExportSettings, ViewportSize } from '$lib/export';
 
 	RectAreaLightUniformsLib.init();
 
 	extend({ RectAreaLight });
 
-	let {
-		screenSrc = '',
-		onpick,
-		onclear,
-	}: {
-		screenSrc?: string;
-		onpick?: (dataUrl: string) => void;
-		onclear?: () => void;
-	} = $props();
+	const editor = provideEditorState();
+	const initialPhonePosition: [number, number, number] = [0, -0.35, 0];
+	const initialPhoneScale = 0.01;
 
-	let envTexture: Texture | undefined = $state();
 	let wallpaperMat: MeshStandardMaterial | undefined = $state();
-	let phoneScene: import('three').Group | undefined = $state();
+	let phoneScene: Group | undefined = $state();
 	let orbitRef: ThreeOrbitControls | undefined = $state();
 	let sceneCamera: PerspectiveCamera | undefined = $state();
-	let transformMode: 'translate' | 'rotate' | 'scale' = $state('translate');
+	let exportCapture: ((settings: ExportSettings) => Promise<Blob>) | undefined = $state();
+	let exportViewport: (() => ViewportSize) | undefined = $state();
+	let hdriTexture: Texture | undefined = $state(undefined);
+	let hdriLoading = $state(false);
+	let previousHdriUrl = $state('');
 
-	const materialPresets: Record<string, Partial<MeshStandardMaterial>> = {
-		BodyFrame: { metalness: 1, roughness: 0.2, envMapIntensity: 1.0 },
-		GrayGlossy2: { metalness: 1, roughness: 0.08, envMapIntensity: 1.0 },
-		GrayGlossy: { metalness: 1, roughness: 0.35, envMapIntensity: 0.8 },
-		PacificBlue: { metalness: 0.8, roughness: 0.3, envMapIntensity: 0.8 },
-		Body: { metalness: 0.7, roughness: 0.45, envMapIntensity: 0.6 },
-		Antenna: { metalness: 1, roughness: 0.7, envMapIntensity: 0.6 },
-		Blackmatte: { metalness: 0, roughness: 0.85, envMapIntensity: 0.2 },
-		Cameralens: { metalness: 0, roughness: 0.02, envMapIntensity: 0.6 },
-		Glass: { metalness: 0, roughness: 0.05, envMapIntensity: 0.3 },
-		bezel: { metalness: 0.6, roughness: 0.12, envMapIntensity: 0.5 },
-		'bezel.001': { metalness: 0.4, roughness: 0.15, envMapIntensity: 0.4 },
-		Logo: { metalness: 1, roughness: 0.15, envMapIntensity: 1.2 },
-		FrontCamera: { metalness: 0, roughness: 0.85, envMapIntensity: 0.15 },
-		MicrophoneSpeaker: { metalness: 0, roughness: 1, envMapIntensity: 0.15 },
-		Flash: { metalness: 0.8, roughness: 0.3, envMapIntensity: 0.6 },
-		Flash2: { metalness: 0.9, roughness: 0.6, envMapIntensity: 0.5 },
-		LiDar: { metalness: 0, roughness: 0.9, envMapIntensity: 0.15 },
-		Wallpaper: {
-			metalness: 0,
-			roughness: 0.6,
-			envMapIntensity: 0.15,
-			emissiveIntensity: 0.15,
-		},
-	};
+	const activePreset = $derived(studioPresets[editor.studio]);
+
+	const activeColorHex = $derived(
+		editor.bodyColorId === 'custom' ? editor.customColor : bodyColors[editor.bodyColorId].hex,
+	);
 
 	function handleReset() {
 		if (!phoneScene) return;
-		phoneScene.position.set(0, 0, 0);
+		phoneScene.position.set(...initialPhonePosition);
 		phoneScene.rotation.set(0, 0.3, 0);
-		phoneScene.scale.set(0.01, 0.01, 0.01);
+		phoneScene.scale.set(initialPhoneScale, initialPhoneScale, initialPhoneScale);
 	}
 
 	function handlePreset(pos: [number, number, number]) {
@@ -83,81 +78,159 @@
 		orbitRef.enableDamping = wasDamping;
 	}
 
-	function handleLoad(gltf: { scene: import('three').Group }) {
-		phoneScene = gltf.scene;
-		gltf.scene.traverse((child) => {
-			if (child instanceof Mesh && child.material) {
-				const material = child.material as MeshStandardMaterial;
-				const preset = materialPresets[material.name];
-				if (preset) Object.assign(material, preset);
+	function applyMaterialPreset() {
+		if (!phoneScene) return;
+		const preset = materialPresets[editor.material];
+		phoneScene.traverse((child) => {
+			// The logo keeps its own fixed finish — it never follows the body material.
+			if (child instanceof Mesh && child.material && isBodyMesh(child.name) && !isLogoMesh(child.name)) {
+				const mat = child.material as MeshStandardMaterial;
+				const surface = preset?.surfaces[mat.name];
+				if (surface) Object.assign(mat, surface);
+			}
+		});
+	}
 
-				if (child.name === 'Screen_Wallpaper_0') {
-					wallpaperMat = material;
+	/**
+	 * The logo is always a polished chrome piece so it stays visible in every
+	 * color / material / lighting, plus a slightly lighter tint and a faint
+	 * emissive so it never disappears at flat angles.
+	 */
+	function applyLogoFinish() {
+		if (!phoneScene) return;
+		phoneScene.traverse((child) => {
+			if (child instanceof Mesh && child.material && isLogoMesh(child.name)) {
+				const mat = child.material as MeshStandardMaterial;
+				Object.assign(mat, { metalness: 1, roughness: 0.02, envMapIntensity: 2.0 });
+				mat.emissiveIntensity = 0.12;
+			}
+		});
+	}
+
+	function applyBodyColor() {
+		if (!phoneScene) return;
+		const bodyColor = new Color(activeColorHex);
+		const logoColor = bodyColor.clone().lerp(new Color('#ffffff'), 0.3);
+		phoneScene.traverse((child) => {
+			if (child instanceof Mesh && child.material && isBodyMesh(child.name)) {
+				const mat = child.material as MeshStandardMaterial;
+				if (isLogoMesh(child.name)) {
+					mat.color.copy(logoColor);
+					mat.emissive.copy(logoColor);
+				} else {
+					mat.color.copy(bodyColor);
 				}
 			}
 		});
 	}
+
+	function handleLoad(gltf: { scene: Group }) {
+		phoneScene = gltf.scene;
+		gltf.scene.traverse((child) => {
+			if (child instanceof Mesh && child.material) {
+				const mat = child.material as MeshStandardMaterial;
+				const surface = surfaces[mat.name];
+				if (surface) Object.assign(mat, surface);
+
+				if (child.name === 'Screen_Wallpaper_0') {
+					wallpaperMat = mat;
+				}
+			}
+		});
+		// Give front-facing parts (bezel, notch, cameras, mic) their own material
+		// instances so body color / surface changes can never leak into them.
+		gltf.scene.traverse((child) => {
+			if (
+				child instanceof Mesh &&
+				child.material &&
+				child.name !== 'Screen_Wallpaper_0' &&
+				isFrontMesh(child.name)
+			) {
+				child.material = (child.material as MeshStandardMaterial).clone();
+			}
+		});
+		applyMaterialPreset();
+		applyLogoFinish();
+		applyBodyColor();
+	}
+
+	function handleExporterReady(
+		capture: (settings: ExportSettings) => Promise<Blob>,
+		getViewport: () => ViewportSize,
+	) {
+		exportCapture = capture;
+		exportViewport = getViewport;
+	}
+
+	$effect(() => {
+		applyMaterialPreset();
+	});
+
+	$effect(() => {
+		applyBodyColor();
+	});
+
+	$effect(() => {
+		const url = editor.hdri;
+		if (url !== previousHdriUrl) {
+			previousHdriUrl = url;
+			hdriLoading = true;
+		}
+	});
+
+	$effect(() => {
+		if (hdriTexture) {
+			hdriLoading = false;
+		}
+	});
 </script>
 
 {#if browser}
 	<div class="relative h-full w-full">
-		<Canvas toneMapping={ACESFilmicToneMapping}>
-			<Background />
+		<Canvas
+			toneMapping={ACESFilmicToneMapping}
+			createRenderer={(canvas) => new WebGLRenderer({ canvas, alpha: true, antialias: true })}
+		>
+			<Background config={editor.background} />
 			<T.PerspectiveCamera
 				makeDefault
-				position={[4, 2.8, 5.5]}
-				fov={24}
+				position={defaultCamera.position}
+				fov={defaultCamera.fov}
 			/>
 
-			<T.RectAreaLight
-				position={[4, 3, 2]}
-				rotation={[-0.4, 0.6, 0]}
-				width={3}
-				height={1.5}
-				color="#ffeecc"
-				intensity={4}
-			/>
+			<LightRig preset={activePreset} exposure={editor.exposure} />
 
-			<T.RectAreaLight
-				position={[-3, 2, -1]}
-				rotation={[0.2, -0.8, 0.1]}
-				width={2}
-				height={1}
-				color="#ccddff"
-				intensity={2}
-			/>
-
-			<Environment
-				url="/environments/studio_small_08_1k.exr"
-				bind:texture={envTexture}
-			/>
+			<Environment url={editor.hdri} bind:texture={hdriTexture} />
 			<GLTF
-				url="/models/iphone_12_pro.glb"
-				scale={0.01}
+				url={MODEL_URL}
+				position={initialPhonePosition}
+				scale={initialPhoneScale}
 				rotation={[0, 0.3, 0]}
 				onload={handleLoad}
 			/>
 
 			{#if wallpaperMat}
-				<ScreenImage material={wallpaperMat} src={screenSrc} />
+				<ScreenImage material={wallpaperMat} src={editor.screenSrc} content={editor.content} />
 			{/if}
 
 			<ContactShadows
 				position={[0, -0.8, 0]}
-				opacity={0.25}
+				opacity={editor.shadow.opacity}
 				scale={6}
-				blur={4}
-				far={3}
+				blur={editor.shadow.blur}
+				far={editor.shadow.distance}
 				resolution={1024}
 			/>
 
 			<TransformControls
 				target={phoneScene}
-				mode={transformMode}
-				{orbitRef}
+				mode={editor.transformMode}
+				orbitControls={orbitRef}
 			/>
 
 			<CameraRef onref={(c) => (sceneCamera = c)} />
+
+			<Exporter onready={handleExporterReady} />
 
 			<OrbitControls
 				enableDamping
@@ -167,15 +240,31 @@
 		</Canvas>
 
 		<EditorOverlay
-			mode={transformMode}
-			onmodechange={(m) => (transformMode = m)}
 			target={phoneScene}
-			{orbitRef}
-			onpick={(url) => onpick?.(url)}
-			onclear={() => onclear?.()}
+			orbitControls={orbitRef}
+			camera={sceneCamera}
 			onreset={handleReset}
 			onpreset={handlePreset}
-			hasImage={screenSrc !== ''}
+			{exportCapture}
+			exportViewport={exportViewport}
 		/>
+
+		{#if !phoneScene}
+			<div class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" role="status" aria-live="polite">
+				<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-[var(--kairo-base)] px-3 py-2 text-[12px] text-neutral-600 shadow-sm">
+					<span class="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--kairo-sapphire)]"></span>
+					Loading iPhone 12 Pro
+				</div>
+			</div>
+		{/if}
+
+		{#if hdriLoading && phoneScene}
+			<div class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" role="status" aria-live="polite">
+				<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-[var(--kairo-base)] px-3 py-2 text-[12px] text-neutral-600 shadow-sm">
+					<span class="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--kairo-sapphire)]"></span>
+					Loading environment...
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
