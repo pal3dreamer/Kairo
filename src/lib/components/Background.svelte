@@ -28,14 +28,24 @@
 		scene.background = current;
 	}
 
-	function setGradient(top: string, bottom: string) {
+	function setGradient(top: string, bottom: string, angle: number, spread: number) {
 		dispose();
 		const canvas = document.createElement('canvas');
-		canvas.width = 1;
+		canvas.width = 512;
 		canvas.height = 512;
 		const ctx = canvas.getContext('2d')!;
-		const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+		const radians = ((angle - 90) * Math.PI) / 180;
+		const radius = Math.abs(canvas.width * Math.cos(radians)) + Math.abs(canvas.height * Math.sin(radians));
+		const dx = (Math.cos(radians) * radius) / 2;
+		const dy = (Math.sin(radians) * radius) / 2;
+		const center = canvas.width / 2;
+		const gradient = ctx.createLinearGradient(center - dx, center - dy, center + dx, center + dy);
+		const transition = Math.max(0.08, Math.min(1, spread));
+		const topStop = (1 - transition) / 2;
+		const bottomStop = 1 - topStop;
 		gradient.addColorStop(0, top);
+		if (topStop > 0) gradient.addColorStop(topStop, top);
+		if (bottomStop < 1) gradient.addColorStop(bottomStop, bottom);
 		gradient.addColorStop(1, bottom);
 		ctx.fillStyle = gradient;
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -66,7 +76,12 @@
 				setSolid(config.solidColor ?? '#ffffff');
 				break;
 			case 'gradient':
-				setGradient(config.gradientTop ?? '#ececec', config.gradientBottom ?? '#f8f8f8');
+				setGradient(
+					config.gradientTop ?? '#ececec',
+					config.gradientBottom ?? '#f8f8f8',
+					config.gradientAngle ?? 180,
+					config.gradientSpread ?? 1,
+				);
 				break;
 			case 'transparent':
 				setTransparent();

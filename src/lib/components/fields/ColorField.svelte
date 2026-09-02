@@ -10,14 +10,67 @@
 	} = $props();
 </script>
 
-<div class="flex items-center gap-2.5">
-	<span class="w-16 shrink-0 text-[12px] text-gray-500">{label}</span>
-	<input
-		type="color"
-		value={value}
-		oninput={(e) => oninput(e.currentTarget.value)}
-		aria-label={label}
-		class="h-7 w-9 shrink-0 cursor-pointer rounded-md border border-gray-200 bg-white p-0.5"
-	/>
-	<span class="text-[12px] tabular-nums text-gray-400">{value}</span>
-</div>
+<label class="color-row">
+	<span class="color-label">{label}</span>
+	<span class="color-control k-field">
+		<span class="color-swatch" style={`background: ${value}`}></span>
+		<span class="color-value">{value.toUpperCase()}</span>
+		<input
+			type="color"
+			value={value}
+			oninput={(e) => oninput(e.currentTarget.value)}
+			aria-label={label}
+			class="color-input"
+		/>
+	</span>
+</label>
+
+<style>
+	.color-row {
+		display: grid;
+		grid-template-columns: 72px minmax(0, 1fr);
+		align-items: center;
+		gap: 8px;
+	}
+
+	.color-label {
+		color: var(--kairo-ink-secondary);
+		font-size: 12px;
+	}
+
+	.color-control {
+		position: relative;
+		display: flex;
+		height: 28px;
+		min-width: 0;
+		align-items: center;
+		gap: 7px;
+		padding: 0 8px 0 5px;
+		cursor: pointer;
+	}
+
+	.color-swatch {
+		height: 18px;
+		width: 24px;
+		flex: 0 0 auto;
+		border: 1px solid oklch(0.25 0.018 242 / 0.17);
+		border-radius: 3px;
+	}
+
+	.color-value {
+		overflow: hidden;
+		color: var(--kairo-ink-muted);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		text-overflow: ellipsis;
+	}
+
+	.color-input {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
+	}
+</style>

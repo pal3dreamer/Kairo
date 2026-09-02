@@ -24,6 +24,7 @@
 	import EditorOverlay from './EditorOverlay.svelte';
 	import LightRig from './LightRig.svelte';
 	import Exporter from './Exporter.svelte';
+	import ShowcaseController from './ShowcaseController.svelte';
 	import { surfaces } from '$lib/renderer/surfaces';
 	import {
 		isBodyMesh,
@@ -54,6 +55,8 @@
 	let hdriTexture: Texture | undefined = $state(undefined);
 	let hdriLoading = $state(false);
 	let previousHdriUrl = $state('');
+	let showcaseStage: HTMLDivElement | undefined = $state();
+	const showcaseEnabled = browser && new URLSearchParams(window.location.search).get('showcase') === '1';
 
 	const activePreset = $derived(studioPresets[editor.studio]);
 
@@ -186,11 +189,16 @@
 </script>
 
 {#if browser}
-	<div class="relative h-full w-full">
-		<Canvas
-			toneMapping={ACESFilmicToneMapping}
-			createRenderer={(canvas) => new WebGLRenderer({ canvas, alpha: true, antialias: true })}
+	<div class="relative h-full w-full overflow-hidden">
+		<div
+			bind:this={showcaseStage}
+			class="relative h-full w-full origin-top-left"
+			style={showcaseEnabled ? 'will-change: transform' : undefined}
 		>
+			<Canvas
+				toneMapping={ACESFilmicToneMapping}
+				createRenderer={(canvas) => new WebGLRenderer({ canvas, alpha: true, antialias: true })}
+			>
 			<Background config={editor.background} />
 			<T.PerspectiveCamera
 				makeDefault
@@ -237,34 +245,83 @@
 				target={[0, 0, 0]}
 				bind:ref={orbitRef}
 			/>
-		</Canvas>
+			</Canvas>
 
-		<EditorOverlay
-			target={phoneScene}
-			orbitControls={orbitRef}
-			camera={sceneCamera}
-			onreset={handleReset}
-			onpreset={handlePreset}
-			{exportCapture}
-			exportViewport={exportViewport}
-		/>
+			<EditorOverlay
+				target={phoneScene}
+				orbitControls={orbitRef}
+				camera={sceneCamera}
+				onreset={handleReset}
+				onpreset={handlePreset}
+				{exportCapture}
+				exportViewport={exportViewport}
+			/>
 
-		{#if !phoneScene}
-			<div class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" role="status" aria-live="polite">
-				<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-[var(--kairo-base)] px-3 py-2 text-[12px] text-neutral-600 shadow-sm">
-					<span class="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--kairo-sapphire)]"></span>
-					Loading iPhone 12 Pro
+			{#if !phoneScene}
+				<div class="scene-status-wrap" role="status" aria-live="polite">
+					<div class="scene-status">
+						<span class="status-spinner"></span>
+						Loading iPhone 12 Pro
+					</div>
 				</div>
-			</div>
-		{/if}
+			{/if}
 
-		{#if hdriLoading && phoneScene}
-			<div class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" role="status" aria-live="polite">
-				<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-[var(--kairo-base)] px-3 py-2 text-[12px] text-neutral-600 shadow-sm">
-					<span class="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--kairo-sapphire)]"></span>
-					Loading environment...
+			{#if hdriLoading && phoneScene}
+				<div class="scene-status-wrap" role="status" aria-live="polite">
+					<div class="scene-status">
+						<span class="status-spinner"></span>
+						Loading environment
+					</div>
 				</div>
-			</div>
+			{/if}
+		</div>
+
+		{#if showcaseEnabled}
+			<ShowcaseController
+				stage={showcaseStage}
+				target={phoneScene}
+				camera={sceneCamera}
+				orbitControls={orbitRef}
+			/>
 		{/if}
 	</div>
 {/if}
+
+<style>
+	.scene-status-wrap {
+		pointer-events: none;
+		position: absolute;
+		z-index: 20;
+		inset: 0;
+		display: grid;
+		place-items: center;
+	}
+
+	.scene-status {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px;
+		border: 1px solid var(--kairo-divider);
+		border-radius: 4px;
+		background: color-mix(in oklch, var(--kairo-panel-raised) 94%, transparent);
+		box-shadow: 0 4px 14px oklch(0.25 0.018 242 / 0.1);
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+		font-weight: 600;
+	}
+
+	.status-spinner {
+		height: 10px;
+		width: 10px;
+		border: 1.5px solid var(--kairo-divider);
+		border-top-color: var(--kairo-sapphire);
+		border-radius: 50%;
+		animation: status-spin 700ms linear infinite;
+	}
+
+	@keyframes status-spin {
+		to { transform: rotate(360deg); }
+	}
+</style>

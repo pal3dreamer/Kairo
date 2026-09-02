@@ -1,16 +1,15 @@
 <script lang="ts">
+	import { RotateCcw } from '@lucide/svelte';
 	import Section from '../fields/Section.svelte';
 	import Slider from '../fields/Slider.svelte';
 	import Segmented from '../fields/Segmented.svelte';
 	import SwatchRow from '../fields/SwatchRow.svelte';
 	import ColorField from '../fields/ColorField.svelte';
 	import NumberRow from '../fields/NumberRow.svelte';
-	import MediaPicker from '../fields/MediaPicker.svelte';
 	import { poll } from '$lib/editor/poll';
 	import { getEditorState, type ContentConfig, type ShadowConfig } from '$lib/editor/state.svelte';
 	import { bodyColorList } from '$lib/renderer/bodyColors';
-	import { finishOptions } from '$lib/renderer/presets';
-	import type { BodyColorId, MaterialPresetId } from '$lib/renderer/types';
+	import type { BodyColorId } from '$lib/renderer/types';
 
 	let {
 		target,
@@ -26,11 +25,13 @@
 	let rot = $state<[number, number, number]>([0, 0, 0]);
 	let sca = $state<[number, number, number]>([1, 1, 1]);
 
-	const colors = bodyColorList.map((c) => ({
-		id: c.id,
-		label: c.label,
-		swatch: c.id === 'custom' ? editor.customColor : c.hex,
-	}));
+	const colors = $derived(
+		bodyColorList.map((color) => ({
+			id: color.id,
+			label: color.label,
+			swatch: color.id === 'custom' ? editor.customColor : color.hex,
+		})),
+	);
 
 	poll(
 		() => {
@@ -45,19 +46,21 @@
 				scale: [target.scale.x, target.scale.y, target.scale.z] as [number, number, number],
 			};
 		},
-		(v) => {
-			pos = v.position;
-			rot = v.rotation;
-			sca = v.scale;
+		(value) => {
+			pos = value.position;
+			rot = value.rotation;
+			sca = value.scale;
 		},
 	);
 
 	function setPos(x: number, y: number, z: number) {
 		target?.position.set(x, y, z);
 	}
+
 	function setRot(x: number, y: number, z: number) {
 		target?.rotation.set((x * Math.PI) / 180, (y * Math.PI) / 180, (z * Math.PI) / 180);
 	}
+
 	function setSca(x: number, y: number, z: number) {
 		target?.scale.set(x, y, z);
 	}
@@ -71,53 +74,22 @@
 	}
 </script>
 
-<Section title="Transform" open={true}>
-	<div class="space-y-2.5">
-		<NumberRow label="Position" x={pos[0]} y={pos[1]} z={pos[2]} onchange={setPos} />
-		<NumberRow label="Rotation" x={rot[0]} y={rot[1]} z={rot[2]} step={1} onchange={setRot} />
-		<NumberRow label="Scale" x={sca[0]} y={sca[1]} z={sca[2]} step={0.01} onchange={setSca} />
-		{#if onreset}
-			<button
-				class="w-full rounded-md border border-gray-200 px-2.5 py-2 text-[12px] text-neutral-600 transition-colors hover:bg-gray-100"
-				onclick={onreset}
-			>
-				Reset Transform
-			</button>
+<Section title="Appearance" open={true} summary={bodyColorList.find((color) => color.id === editor.bodyColorId)?.label} showcaseId="appearance">
+	<div class="field-stack roomy">
+		<div class="field-group">
+			<span class="field-label">Body color</span>
+			<SwatchRow options={colors} value={editor.bodyColorId} onchange={(id) => editor.setBodyColor(id as BodyColorId)} />
+		</div>
+		{#if editor.bodyColorId === 'custom'}
+			<ColorField label="Custom" value={editor.customColor} oninput={(hex) => editor.setCustomColor(hex)} />
 		{/if}
 	</div>
 </Section>
 
-<Section title="Appearance">
-	<div class="space-y-3.5">
-		<div>
-			<span class="mb-2 block text-[12px] text-gray-500">Color</span>
-			<SwatchRow options={colors} value={editor.bodyColorId} onchange={(id) => editor.setBodyColor(id as BodyColorId)} />
-			{#if editor.bodyColorId === 'custom'}
-				<div class="mt-2.5">
-					<ColorField label="Custom" value={editor.customColor} oninput={(hex) => editor.setCustomColor(hex)} />
-				</div>
-			{/if}
-		</div>
-		<div>
-			<span class="mb-2 block text-[12px] text-gray-500">Finish</span>
-			<Segmented options={finishOptions} value={editor.material} onchange={(id) => editor.setMaterial(id as MaterialPresetId)} columns={3} />
-		</div>
-	</div>
-</Section>
-
-<Section title="Screen">
-	<div class="space-y-3">
-		<MediaPicker
-			accept="image/*"
-			label="Replace"
-			onpick={(dataUrl) => editor.setScreen(dataUrl)}
-			onclear={editor.clearScreen}
-			clearLabel="Remove"
-			showClear={!!editor.screenSrc}
-		/>
-
-		<div>
-			<span class="mb-2 block text-[12px] text-gray-500">Fit</span>
+<Section title="Screen" summary={editor.screenSrc ? 'Image' : 'Empty'} showcaseId="screen" open={false}>
+	<div class="field-stack">
+		<div class="field-group compact">
+			<span class="field-label">Fit</span>
 			<Segmented
 				options={[
 					{ id: 'fit', label: 'Fit' },
@@ -129,20 +101,90 @@
 			/>
 		</div>
 
-		<Slider label="Scale" min={0.2} max={2} step={0.01} value={editor.content.scale} onchange={(v) => patchContent({ scale: v })} />
-		<Slider label="Rotate" min={-180} max={180} step={1} value={editor.content.rotation} format={(v) => `${Math.round(v)}°`} onchange={(v) => patchContent({ rotation: v })} />
-		<Slider label="Pos X" min={-1} max={1} step={0.01} value={editor.content.offsetX} onchange={(v) => patchContent({ offsetX: v })} />
-		<Slider label="Pos Y" min={-1} max={1} step={0.01} value={editor.content.offsetY} onchange={(v) => patchContent({ offsetY: v })} />
-		<Slider label="Brightness" min={0} max={2} step={0.01} value={editor.content.brightness} format={(v) => `${v.toFixed(2)}×`} onchange={(v) => patchContent({ brightness: v })} />
-		<Slider label="Contrast" min={0} max={2} step={0.01} value={editor.content.contrast} format={(v) => `${v.toFixed(2)}×`} onchange={(v) => patchContent({ contrast: v })} />
-		<Slider label="Saturation" min={0} max={2} step={0.01} value={editor.content.saturation} format={(v) => `${v.toFixed(2)}×`} onchange={(v) => patchContent({ saturation: v })} />
+		<div class="control-list">
+			<Slider label="Scale" min={0.2} max={2} step={0.01} value={editor.content.scale} onchange={(value) => patchContent({ scale: value })} />
+			<Slider label="Rotate" min={-180} max={180} step={1} value={editor.content.rotation} format={(value) => `${Math.round(value)}°`} onchange={(value) => patchContent({ rotation: value })} />
+			<Slider label="Pos X" min={-1} max={1} step={0.01} value={editor.content.offsetX} format={(value) => value.toFixed(2)} onchange={(value) => patchContent({ offsetX: value })} />
+			<Slider label="Pos Y" min={-1} max={1} step={0.01} value={editor.content.offsetY} format={(value) => value.toFixed(2)} onchange={(value) => patchContent({ offsetY: value })} />
+			<Slider label="Brightness" min={0} max={2} step={0.01} value={editor.content.brightness} format={(value) => `${value.toFixed(2)}x`} onchange={(value) => patchContent({ brightness: value })} />
+			<Slider label="Contrast" min={0} max={2} step={0.01} value={editor.content.contrast} format={(value) => `${value.toFixed(2)}x`} onchange={(value) => patchContent({ contrast: value })} />
+			<Slider label="Saturation" min={0} max={2} step={0.01} value={editor.content.saturation} format={(value) => `${value.toFixed(2)}x`} onchange={(value) => patchContent({ saturation: value })} />
+		</div>
 	</div>
 </Section>
 
-<Section title="Shadow">
-	<div class="space-y-2.5">
-		<Slider label="Opacity" min={0} max={1} step={0.01} value={editor.shadow.opacity} onchange={(v) => patchShadow({ opacity: v })} />
-		<Slider label="Blur" min={0} max={10} step={0.1} value={editor.shadow.blur} onchange={(v) => patchShadow({ blur: v })} />
-		<Slider label="Distance" min={0} max={6} step={0.1} value={editor.shadow.distance} onchange={(v) => patchShadow({ distance: v })} />
+<Section title="Transform" summary={`${rot[1].toFixed(0)}°`} open={false}>
+	<div class="field-stack compact-stack">
+		<NumberRow label="Position" x={pos[0]} y={pos[1]} z={pos[2]} onchange={setPos} />
+		<NumberRow label="Rotation" x={rot[0]} y={rot[1]} z={rot[2]} step={1} onchange={setRot} />
+		<NumberRow label="Scale" x={sca[0]} y={sca[1]} z={sca[2]} step={0.01} onchange={setSca} />
+		{#if onreset}
+			<button type="button" class="reset-button" onclick={onreset}>
+				<RotateCcw size={13} strokeWidth={1.7} />
+				Reset transform
+			</button>
+		{/if}
 	</div>
 </Section>
+
+<Section title="Shadow" summary={`${Math.round(editor.shadow.opacity * 100)}%`} showcaseId="shadow" open={false}>
+	<div class="control-list">
+		<Slider label="Opacity" min={0} max={1} step={0.01} value={editor.shadow.opacity} format={(value) => `${Math.round(value * 100)}%`} onchange={(value) => patchShadow({ opacity: value })} />
+		<Slider label="Blur" min={0} max={10} step={0.1} value={editor.shadow.blur} format={(value) => value.toFixed(1)} onchange={(value) => patchShadow({ blur: value })} />
+		<Slider label="Distance" min={0} max={6} step={0.1} value={editor.shadow.distance} format={(value) => value.toFixed(1)} onchange={(value) => patchShadow({ distance: value })} />
+	</div>
+</Section>
+
+<style>
+	.field-stack {
+		display: grid;
+		gap: 12px;
+	}
+
+	.field-stack.roomy {
+		gap: 14px;
+	}
+
+	.compact-stack {
+		gap: 8px;
+	}
+
+	.field-group {
+		display: grid;
+		gap: 8px;
+	}
+
+	.field-group.compact {
+		gap: 6px;
+	}
+
+	.field-label {
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+	}
+
+	.control-list {
+		display: grid;
+		gap: 2px;
+	}
+
+	.reset-button {
+		display: flex;
+		height: 29px;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		margin-top: 2px;
+		border: 1px solid var(--kairo-divider);
+		border-radius: 4px;
+		background: transparent;
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+		font-weight: 600;
+	}
+
+	.reset-button:hover {
+		background: var(--kairo-field);
+		color: var(--kairo-ink);
+	}
+</style>

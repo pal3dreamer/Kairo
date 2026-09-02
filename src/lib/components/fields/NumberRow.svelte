@@ -16,16 +16,16 @@
 	} = $props();
 </script>
 
-<div>
-	<span class="mb-1 block text-[12px] text-gray-500">{label}</span>
-	<div class="flex gap-1.5">
+<div class="number-row">
+	<span class="number-label">{label}</span>
+	<div class="number-fields">
 		{#each [
 			{ v: x, axis: 'X' },
 			{ v: y, axis: 'Y' },
 			{ v: z, axis: 'Z' },
 		] as field, i}
-			<div class="relative">
-				<span class="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-gray-400">
+			<label class="number-field">
+				<span class="axis">
 					{field.axis}
 				</span>
 				<input
@@ -40,9 +40,57 @@
 						else onchange(x, y, n);
 					}}
 					aria-label={`${label} ${field.axis}`}
-					class="w-full rounded-md border border-gray-200 bg-gray-50 py-1.5 pl-7 pr-1.5 text-[12px] tabular-nums text-neutral-700 outline-none focus:border-neutral-400"
+					class="k-field value-input"
 				/>
-			</div>
+			</label>
 		{/each}
 	</div>
 </div>
+
+<style>
+	.number-row {
+		display: grid;
+		grid-template-columns: 58px minmax(0, 1fr);
+		align-items: center;
+		gap: 8px;
+	}
+
+	.number-label {
+		color: var(--kairo-ink-secondary);
+		font-size: 12px;
+	}
+
+	.number-fields {
+		display: grid;
+		min-width: 0;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 4px;
+	}
+
+	.number-field {
+		position: relative;
+		min-width: 0;
+	}
+
+	.axis {
+		position: absolute;
+		z-index: 1;
+		left: 6px;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--kairo-ink-faint);
+		font-size: 9px;
+		font-weight: 600;
+		pointer-events: none;
+	}
+
+	.value-input {
+		width: 100%;
+		height: 27px;
+		min-width: 0;
+		padding: 0 4px 0 17px;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		outline: none;
+	}
+</style>

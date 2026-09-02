@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { Download, Link, Link2Off, LoaderCircle, X } from '@lucide/svelte';
 	import {
 		dimensionsForPreset,
 		exportFileName,
@@ -139,191 +140,512 @@
 </script>
 
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+	class="export-backdrop"
 	role="presentation"
 	onclick={(event) => {
 		if (event.target === event.currentTarget && !exporting) onclose();
 	}}
 >
 	<div
-		class="w-full max-w-md rounded-lg border border-gray-200 bg-[var(--kairo-base)] p-5 shadow-2xl"
+		data-showcase="export-modal"
+		class="export-dialog"
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="export-title"
 	>
-		<div class="flex items-start justify-between gap-4">
+		<header class="dialog-header">
 			<div>
-				<h2 id="export-title" class="text-sm font-semibold text-neutral-900">Export image</h2>
-				<p class="mt-0.5 text-[11px] text-gray-400">Choose exact output dimensions and format.</p>
+				<span>Output</span>
+				<h2 id="export-title">Export image</h2>
 			</div>
-			<button
-				type="button"
-				class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-neutral-900"
-				title="Close export"
-				aria-label="Close export"
-				disabled={exporting}
-				onclick={onclose}
-			>
-				<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-					<path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-				</svg>
+			<button type="button" class="k-icon-button" title="Close export" aria-label="Close export" disabled={exporting} onclick={onclose}>
+				<X size={15} strokeWidth={1.7} />
 			</button>
-		</div>
+		</header>
 
-		<div class="mt-5">
-			<div class="mb-2 flex items-center justify-between">
-				<span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Presets</span>
-				<span class="text-[11px] tabular-nums text-gray-500">{width} x {height}</span>
-			</div>
-			<div class="grid grid-cols-3 gap-1.5">
-				{#each exportPresets as preset (preset.id)}
+		<div class="dialog-body kairo-scrollbar">
+			<section class="export-section first">
+				<div class="section-title">
+					<h3>Presets</h3>
+					<span>{width} x {height}</span>
+				</div>
+				<div class="preset-grid">
+					{#each exportPresets as preset (preset.id)}
+						<button
+							data-showcase-option={preset.id}
+							type="button"
+							disabled={exporting}
+							title={preset.description}
+							class:active={selectedPreset === preset.id}
+							class="export-preset"
+							onclick={() => selectPreset(preset.id)}
+						>
+							<span class="preset-frame" aria-hidden="true"></span>
+							<strong>{preset.label}</strong>
+							<small>{presetDimensions(preset.id)}</small>
+						</button>
+					{/each}
 					<button
 						type="button"
 						disabled={exporting}
-						title={preset.description}
-						class="flex min-h-14 flex-col items-start justify-center rounded-md border px-2 text-left transition-colors {selectedPreset === preset.id
-							? 'border-[var(--kairo-sapphire)] bg-[var(--kairo-sapphire-soft)] text-[var(--kairo-sapphire-strong)]'
-							: 'border-gray-200 bg-white text-neutral-600 hover:bg-gray-100'}"
-						onclick={() => selectPreset(preset.id)}
+						class:active={selectedPreset === 'custom'}
+						class="export-preset"
+						onclick={() => (selectedPreset = 'custom')}
 					>
-						<span class="text-[11px] font-semibold">{preset.label}</span>
-						<span class="mt-0.5 text-[10px] text-gray-400">{presetDimensions(preset.id)}</span>
+						<span class="preset-frame custom" aria-hidden="true"></span>
+						<strong>Custom</strong>
+						<small>{width} x {height}</small>
 					</button>
-				{/each}
-				<button
-					type="button"
-					disabled={exporting}
-					title="Set custom dimensions"
-					class="flex min-h-14 flex-col items-start justify-center rounded-md border px-2 text-left transition-colors {selectedPreset === 'custom'
-						? 'border-[var(--kairo-sapphire)] bg-[var(--kairo-sapphire-soft)] text-[var(--kairo-sapphire-strong)]'
-						: 'border-gray-200 bg-white text-neutral-600 hover:bg-gray-100'}"
-					onclick={() => (selectedPreset = 'custom')}
-				>
-					<span class="text-[11px] font-semibold">Custom</span>
-					<span class="mt-0.5 text-[10px] text-gray-400">Set dimensions</span>
-				</button>
-			</div>
-		</div>
-
-		<div class="mt-5 border-t border-gray-200 pt-4">
-			<div class="mb-2 flex items-center justify-between">
-				<span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Dimensions</span>
-				<span class="text-[11px] tabular-nums text-gray-500">{megapixels.toFixed(1)} MP / {ratioLabel()}</span>
-			</div>
-			<div class="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-				<label class="block text-[11px] text-gray-500">
-					Width
-					<input
-						type="number"
-						min="1"
-						max={EXPORT_MAX_DIMENSION}
-						step="1"
-						value={width}
-						disabled={exporting}
-						oninput={(event) => setCustomWidth((event.currentTarget as HTMLInputElement).value)}
-						class="mt-1 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] tabular-nums text-neutral-700 outline-none focus:border-[var(--kairo-sapphire)]"
-					/>
-				</label>
-				<button
-					type="button"
-					disabled={exporting}
-					class="mb-1 flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 transition-colors hover:bg-gray-100 hover:text-neutral-800 {lockAspect ? 'border-[var(--kairo-sapphire)] text-[var(--kairo-sapphire)]' : ''}"
-					title={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-					aria-label={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-					onclick={toggleAspectLock}
-				>
-				{#if lockAspect}
-					<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-						<path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7M4 7h8v6H4V7Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-					</svg>
-				{:else}
-					<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-						<path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-						<path d="M4 7h8v6H4V7Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-					</svg>
-				{/if}
-				</button>
-				<label class="block text-[11px] text-gray-500">
-					Height
-					<input
-						type="number"
-						min="1"
-						max={EXPORT_MAX_DIMENSION}
-						step="1"
-						value={height}
-						disabled={exporting}
-						oninput={(event) => setCustomHeight((event.currentTarget as HTMLInputElement).value)}
-						class="mt-1 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] tabular-nums text-neutral-700 outline-none focus:border-[var(--kairo-sapphire)]"
-					/>
-				</label>
-			</div>
-		</div>
-
-		<div class="mt-5 border-t border-gray-200 pt-4">
-			<div class="grid grid-cols-2 gap-4">
-				<label class="block text-[11px] text-gray-500">
-					Format
-					<select
-						value={format}
-						disabled={exporting}
-						onchange={(event) => setFormat((event.currentTarget as HTMLSelectElement).value)}
-						class="mt-1 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-neutral-700 outline-none focus:border-[var(--kairo-sapphire)]"
-					>
-						{#each exportFormats as option (option.id)}
-							<option value={option.id}>{option.label} (.{option.extension})</option>
-						{/each}
-					</select>
-				</label>
-
-				<label class="flex items-end gap-2 pb-1 text-[11px] text-gray-500">
-					<input
-						type="checkbox"
-						checked={transparent}
-						disabled={exporting || format === 'jpeg'}
-						onchange={(event) => (transparent = (event.currentTarget as HTMLInputElement).checked)}
-						class="h-3.5 w-3.5 accent-[var(--kairo-sapphire)]"
-					/>
-					<span class={format === 'jpeg' ? 'text-gray-300' : ''}>Transparent background</span>
-				</label>
-			</div>
-
-			{#if format !== 'png'}
-				<div class="mt-4 flex items-center gap-3">
-					<span class="w-14 shrink-0 text-[11px] text-gray-500">Quality</span>
-					<input
-						type="range"
-						min="0.1"
-						max="1"
-						step="0.01"
-						value={quality}
-						disabled={exporting}
-						oninput={(event) => (quality = +(event.currentTarget as HTMLInputElement).value)}
-						class="h-1 flex-1 accent-[var(--kairo-sapphire)]"
-					/>
-					<span class="w-10 text-right text-[11px] tabular-nums text-gray-500">{Math.round(quality * 100)}%</span>
 				</div>
-			{/if}
+			</section>
+
+			<section class="export-section">
+				<div class="section-title">
+					<h3>Dimensions</h3>
+					<span>{megapixels.toFixed(1)} MP / {ratioLabel()}</span>
+				</div>
+				<div class="dimension-grid">
+					<label>
+						<span>Width</span>
+						<input
+							type="number"
+							min="1"
+							max={EXPORT_MAX_DIMENSION}
+							step="1"
+							value={width}
+							disabled={exporting}
+							oninput={(event) => setCustomWidth((event.currentTarget as HTMLInputElement).value)}
+							class="k-field"
+						/>
+					</label>
+					<button
+						type="button"
+						disabled={exporting}
+						class:active={lockAspect}
+						class="aspect-lock"
+						title={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+						aria-label={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+						onclick={toggleAspectLock}
+					>
+						{#if lockAspect}<Link size={14} strokeWidth={1.7} />{:else}<Link2Off size={14} strokeWidth={1.7} />{/if}
+					</button>
+					<label>
+						<span>Height</span>
+						<input
+							type="number"
+							min="1"
+							max={EXPORT_MAX_DIMENSION}
+							step="1"
+							value={height}
+							disabled={exporting}
+							oninput={(event) => setCustomHeight((event.currentTarget as HTMLInputElement).value)}
+							class="k-field"
+						/>
+					</label>
+				</div>
+			</section>
+
+			<section class="export-section">
+				<div class="format-grid">
+					<label class="format-field">
+						<span>Format</span>
+						<select
+							value={format}
+							disabled={exporting}
+							onchange={(event) => setFormat((event.currentTarget as HTMLSelectElement).value)}
+							class="k-field"
+						>
+							{#each exportFormats as option (option.id)}
+								<option value={option.id}>{option.label} (.{option.extension})</option>
+							{/each}
+						</select>
+					</label>
+
+					<label class:disabled={format === 'jpeg'} class="toggle-row">
+						<span>Transparent</span>
+						<input
+							type="checkbox"
+							checked={transparent}
+							disabled={exporting || format === 'jpeg'}
+							onchange={(event) => (transparent = (event.currentTarget as HTMLInputElement).checked)}
+						/>
+						<span class="toggle" aria-hidden="true"><span></span></span>
+					</label>
+				</div>
+
+				{#if format !== 'png'}
+					<label class="quality-row">
+						<span>Quality</span>
+						<input
+							type="range"
+							min="0.1"
+							max="1"
+							step="0.01"
+							value={quality}
+							disabled={exporting}
+							oninput={(event) => (quality = +(event.currentTarget as HTMLInputElement).value)}
+						/>
+						<output>{Math.round(quality * 100)}%</output>
+					</label>
+				{/if}
+			</section>
+
+			{#if error}<p class="export-error" role="alert">{error}</p>{/if}
 		</div>
 
-		{#if error}
-			<p class="mt-4 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-700" role="alert">{error}</p>
-		{/if}
-
-		<button
-			type="button"
-			class="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-[var(--kairo-sapphire)] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--kairo-sapphire-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-			disabled={exporting || !capture}
-			onclick={download}
-		>
-			{#if exporting}
-				<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
-				Rendering {width} x {height}...
-			{:else}
-				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-					<path d="M8 1.5v8m0 0 3-3m-3 3-3-3M2.5 10.5v1.2A2.8 2.8 0 0 0 5.3 14.5h5.4a2.8 2.8 0 0 0 2.8-2.8v-1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
-				</svg>
-				Download {format.toUpperCase()}
-			{/if}
-		</button>
+		<footer class="dialog-footer">
+			<span>{width} x {height} / {format.toUpperCase()}</span>
+			<button data-showcase="export-download" type="button" disabled={exporting || !capture} onclick={download}>
+				{#if exporting}
+					<LoaderCircle size={14} strokeWidth={1.8} class="spinner" />
+					Rendering
+				{:else}
+					<Download size={14} strokeWidth={1.8} />
+					Download
+				{/if}
+			</button>
+		</footer>
 	</div>
 </div>
+
+<style>
+	.export-backdrop {
+		position: fixed;
+		z-index: 50;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		padding: 16px;
+		background: oklch(0.25 0.018 242 / 0.34);
+	}
+
+	.export-dialog {
+		display: flex;
+		width: min(472px, 100%);
+		max-height: min(760px, calc(100vh - 32px));
+		flex-direction: column;
+		overflow: hidden;
+		border: 1px solid var(--kairo-divider);
+		border-radius: 6px;
+		background: var(--kairo-panel);
+		box-shadow: 0 24px 64px oklch(0.22 0.018 242 / 0.28);
+	}
+
+	.dialog-header {
+		display: flex;
+		height: 58px;
+		min-height: 58px;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 12px 0 15px;
+		border-bottom: 1px solid var(--kairo-divider);
+	}
+
+	.dialog-header > div {
+		display: grid;
+		gap: 3px;
+	}
+
+	.dialog-header span,
+	.section-title h3 {
+		color: var(--kairo-ink-muted);
+		font-size: 10px;
+		font-weight: 600;
+		line-height: 1;
+		text-transform: uppercase;
+	}
+
+	.dialog-header h2 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 14px;
+		font-weight: 600;
+	}
+
+	.dialog-body {
+		min-height: 0;
+		overflow-y: auto;
+	}
+
+	.export-section {
+		padding: 16px;
+		border-top: 1px solid var(--kairo-divider-soft);
+	}
+
+	.export-section.first {
+		border-top: 0;
+	}
+
+	.section-title {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-bottom: 10px;
+	}
+
+	.section-title h3 {
+		margin: 0;
+	}
+
+	.section-title span,
+	.dialog-footer > span {
+		color: var(--kairo-ink-muted);
+		font-size: 10px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.preset-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 6px;
+	}
+
+	.export-preset {
+		display: grid;
+		min-width: 0;
+		grid-template-columns: 28px minmax(0, 1fr);
+		grid-template-rows: auto auto;
+		align-items: center;
+		column-gap: 7px;
+		padding: 7px;
+		border: 1px solid var(--kairo-divider-soft);
+		border-radius: 5px;
+		background: transparent;
+		color: var(--kairo-ink-secondary);
+		text-align: left;
+	}
+
+	.export-preset:hover {
+		background: var(--kairo-field);
+		color: var(--kairo-ink);
+	}
+
+	.export-preset.active {
+		border-color: var(--kairo-sapphire);
+		background: var(--kairo-sapphire-faint);
+	}
+
+	.preset-frame {
+		grid-row: 1 / 3;
+		display: block;
+		height: 22px;
+		width: 28px;
+		border: 1px solid var(--kairo-ink-faint);
+		border-radius: 2px;
+		background: var(--kairo-panel-raised);
+	}
+
+	.preset-frame.custom {
+		border-style: dashed;
+	}
+
+	.export-preset strong,
+	.export-preset small {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.export-preset strong {
+		font-size: 10px;
+		font-weight: 600;
+	}
+
+	.export-preset small {
+		color: var(--kairo-ink-muted);
+		font-size: 9px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.dimension-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+		align-items: end;
+		gap: 8px;
+	}
+
+	.dimension-grid label,
+	.format-field {
+		display: grid;
+		gap: 5px;
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+	}
+
+	.dimension-grid input,
+	.format-field select {
+		height: 30px;
+		width: 100%;
+		min-width: 0;
+		padding: 0 8px;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		outline: none;
+	}
+
+	.aspect-lock {
+		display: grid;
+		height: 30px;
+		width: 30px;
+		place-items: center;
+		border: 1px solid var(--kairo-divider);
+		border-radius: 4px;
+		background: transparent;
+		color: var(--kairo-ink-muted);
+	}
+
+	.aspect-lock:hover {
+		background: var(--kairo-field);
+		color: var(--kairo-ink);
+	}
+
+	.aspect-lock.active {
+		border-color: var(--kairo-sapphire);
+		color: var(--kairo-sapphire-strong);
+	}
+
+	.format-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		align-items: end;
+		gap: 20px;
+	}
+
+	.toggle-row {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+		cursor: pointer;
+	}
+
+	.toggle-row.disabled {
+		color: var(--kairo-ink-faint);
+	}
+
+	.toggle-row input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.toggle {
+		position: relative;
+		display: block;
+		height: 17px;
+		width: 30px;
+		border: 1px solid var(--kairo-divider);
+		border-radius: 999px;
+		background: var(--kairo-field-hover);
+		transition: border-color 140ms ease, background-color 140ms ease;
+	}
+
+	.toggle span {
+		position: absolute;
+		left: 2px;
+		top: 2px;
+		height: 11px;
+		width: 11px;
+		border-radius: 50%;
+		background: var(--kairo-panel-raised);
+		box-shadow: 0 1px 2px oklch(0.25 0.018 242 / 0.2);
+		transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.toggle-row input:checked + .toggle {
+		border-color: var(--kairo-sapphire);
+		background: var(--kairo-sapphire);
+	}
+
+	.toggle-row input:checked + .toggle span {
+		transform: translateX(13px);
+	}
+
+	.quality-row {
+		display: grid;
+		grid-template-columns: 60px minmax(0, 1fr) 38px;
+		align-items: center;
+		gap: 8px;
+		margin-top: 14px;
+		color: var(--kairo-ink-secondary);
+		font-size: 11px;
+	}
+
+	.quality-row input {
+		accent-color: var(--kairo-sapphire);
+	}
+
+	.quality-row output {
+		color: var(--kairo-ink-muted);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+
+	.export-error {
+		margin: 0 16px 16px;
+		padding: 8px 10px;
+		border: 1px solid color-mix(in oklch, var(--kairo-danger) 30%, transparent);
+		border-radius: 4px;
+		background: var(--kairo-danger-soft);
+		color: var(--kairo-danger);
+		font-size: 11px;
+	}
+
+	.dialog-footer {
+		display: flex;
+		height: 54px;
+		min-height: 54px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 0 12px 0 16px;
+		border-top: 1px solid var(--kairo-divider);
+		background: var(--kairo-panel-raised);
+	}
+
+	.dialog-footer button {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		padding: 0 13px;
+		border: 1px solid var(--kairo-ink);
+		border-radius: 4px;
+		background: var(--kairo-ink);
+		color: var(--kairo-panel-raised);
+		font-size: 11px;
+		font-weight: 600;
+	}
+
+	.dialog-footer button:hover {
+		background: color-mix(in oklch, var(--kairo-ink) 88%, var(--kairo-sapphire));
+	}
+
+	:global(.spinner) {
+		animation: spin 700ms linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	@media (max-width: 520px) {
+		.export-backdrop {
+			align-items: end;
+			padding: 8px;
+		}
+
+		.export-dialog {
+			max-height: calc(100vh - 16px);
+		}
+
+		.preset-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+</style>
